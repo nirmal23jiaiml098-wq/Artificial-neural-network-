@@ -1,0 +1,61 @@
+import numpy as np
+import matplotlib.pyplot as plt
+
+class LVQ:
+    def __init__(self, learning_rate=0.1, epochs=100, decay=0.95):
+        self.learning_rate = learning_rate
+        self.epochs = epochs
+        self.decay = decay
+        self.prototypes = None
+        self.prototype_labels = None
+
+    def _initialize_prototypes(self, X, y, n_per_class):
+        self.prototypes = []
+        self.prototype_labels = []
+        for cls in np.unique(y):
+            idx = np.where(y == cls)[0]
+            chosen = X[np.random.choice(idx, n_per_class, replace=False)]
+            self.prototypes.extend(chosen)
+            self.prototype_labels.extend([cls] * n_per_class)
+        self.prototypes = np.array(self.prototypes)
+        self.prototype_labels = np.array(self.prototype_labels)
+
+    def fit(self, X, y, n_prototypes_per_class=1):
+        self._initialize_prototypes(X, y, n_prototypes_per_class)
+        for epoch in range(self.epochs):
+            for xi, label in zip(X, y):
+                distances = np.linalg.norm(self.prototypes - xi, axis=1)
+                winner_idx = np.argmin(distances)
+                if self.prototype_labels[winner_idx] == label:
+                    self.prototypes[winner_idx] += self.learning_rate * (xi - self.prototypes[winner_idx])
+                else:
+                    self.prototypes[winner_idx] -= self.learning_rate * (xi - self.prototypes[winner_idx])
+            self.learning_rate *= self.decay
+
+    def predict(self, X):
+        distances = np.linalg.norm(self.prototypes[:, np.newaxis] - X, axis=2)
+        winner_idx = np.argmin(distances, axis=0)
+        return self.prototype_labels[winner_idx]
+
+if __name__ == "__main__":
+    np.random.seed(42)
+    class0 = np.random.randn(50, 2) + [0, 0]
+    class1 = np.random.randn(50, 2) + [3, 3]
+    X = np.vstack((class0, class1))
+    y = np.array([0]*50 + [1]*50)
+
+    lvq = LVQ(learning_rate=0.3, epochs=20)
+    lvq.fit(X, y, n_prototypes_per_class=2)
+
+    preds = lvq.predict(X)
+    acc = np.mean(preds == y)
+    print(f"Training Accuracy: {acc:.2f}")
+
+    plt.figure(figsize=(6,6))
+    plt.scatter(X[:,0], X[:,1], c=y, cmap="coolwarm", alpha=0.6, label="Data")
+    plt.scatter(lvq.prototypes[:,0], lvq.prototypes[:,1],
+                c=lvq.prototype_labels, cmap="coolwarm", edgecolors="k",
+                marker="X", s=200, label="Prototypes")
+    plt.title("Learning Vector Quantization (LVQ)")
+    plt.legend()
+    plt.show()
